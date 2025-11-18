@@ -1,0 +1,12 @@
+# Frontend
+grofers/node_modules
+grofers/.next
+grofers/.env.local
+
+# Backend
+grofers-backend/node_modules
+grofers-backend/.env
+
+# Common
+npm-debug.log
+dist
