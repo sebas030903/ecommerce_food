@@ -4,14 +4,18 @@ const nextConfig = {
   images: {
     unoptimized: true,
     domains: [
-      'localhost',
-      'res.cloudinary.com',
-      'i.imgur.com',
-      'images.unsplash.com',
-      'cdn.pixabay.com',
+      "localhost",
+      "res.cloudinary.com",
+      "i.imgur.com",
+      "images.unsplash.com",
+      "cdn.pixabay.com",
     ],
   },
-  output: "standalone",
+  experimental: {
+    serverActions: false,
+  },
+  // 🚀 ESTE ES EL FIX DEFINITIVO
+  generateStaticParams: () => [],
 };
 
-module.exports = nextConfig;
+export default nextConfig;
