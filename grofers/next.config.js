@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+
   images: {
     unoptimized: true,
     domains: [
@@ -11,11 +12,10 @@ const nextConfig = {
       "cdn.pixabay.com",
     ],
   },
+
   experimental: {
-    serverActions: false,
-  },
-  // 🚀 ESTE ES EL FIX DEFINITIVO
-  generateStaticParams: () => [],
+    serverActions: {}
+  }
 };
 
 export default nextConfig;
