@@ -6,6 +6,8 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:4000";
 
+console.log("Google OAuth Callback URL:", `${BACKEND_URL}/api/auth/google/callback`);
+
 passport.use(
   new GoogleStrategy(
     {
