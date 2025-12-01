@@ -11,6 +11,9 @@ export default function Home() {
       {/* 🖼️ Slider */}
       <Slider />
 
+      {/* 🛒 Lista de Categorías */}
+      <CategoryList />
+
       {/* 🧺 Lista de Productos */}
       <ProductList />
 
