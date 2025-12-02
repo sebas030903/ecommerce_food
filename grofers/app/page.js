@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Slider from "./_components/Slider";
-import CategoryList from "./_components/CategoryList";
+// ❌ import CategoryList from "./_components/CategoryList";
 import ProductList from "./_components/ProductList";
 import Footer from "./_components/Footer";
 
@@ -11,10 +11,7 @@ export default function Home() {
       {/* 🖼️ Slider */}
       <Slider />
 
-      {/* 🛒 Lista de Categorías */}
-      <CategoryList />
-
-      {/* 🧺 Lista de Productos */}
+      {/* 🧺 Lista de Productos (ya incluye categorías + buscador + paginación) */}
       <ProductList />
 
       {/* 📢 Banner Promocional */}
