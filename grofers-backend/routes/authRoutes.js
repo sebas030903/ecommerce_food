@@ -2,9 +2,11 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { body } from "express-validator";
 import User from "../models/User.js";
+import Order from "../models/Order.js";
 import passport from "passport";
 import "../utils/passportGoogle.js";
 import { handleValidation } from "../middleware/validate.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -36,13 +38,42 @@ function setRefreshCookie(res, token) {
 
 /* ======================================================
    REGISTER
+   (nombre solo letras, correo gmail/hotmail/outlook,
+    contraseña >=8 visibles y al menos 1 número)
 ====================================================== */
 router.post(
   "/register",
   [
-    body("name").isString().trim().isLength({ min: 2 }),
-    body("email").isEmail(),
-    body("password").isLength({ min: 8 }),
+    body("name")
+      .isString()
+      .trim()
+      .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
+      .withMessage("El nombre solo puede contener letras y espacios.")
+      .isLength({ min: 2 })
+      .withMessage("El nombre debe tener al menos 2 caracteres."),
+    body("email")
+      .isEmail()
+      .withMessage("Correo inválido")
+      .custom((value) => {
+        if (!/@(gmail\.com|hotmail\.com|outlook\.com)$/i.test(value)) {
+          throw new Error(
+            "El correo debe terminar en @gmail.com, @hotmail.com o @outlook.com."
+          );
+        }
+        return true;
+      }),
+    body("password").custom((value) => {
+      const visible = value.replace(/\s/g, ""); // quita espacios normales e invisibles
+      if (visible.length < 8) {
+        throw new Error(
+          "La contraseña debe tener al menos 8 caracteres (sin contar espacios)."
+        );
+      }
+      if (!/\d/.test(visible)) {
+        throw new Error("La contraseña debe incluir al menos un número.");
+      }
+      return true;
+    }),
   ],
   handleValidation,
   async (req, res) => {
@@ -50,7 +81,8 @@ router.post(
       const { name, email, password } = req.body;
 
       const exists = await User.findOne({ email });
-      if (exists) return res.status(409).json({ error: "Correo ya registrado" });
+      if (exists)
+        return res.status(409).json({ error: "Correo ya registrado" });
 
       const user = await User.create({ name, email, password });
 
@@ -65,6 +97,7 @@ router.post(
 
       return res.json({ user: safeUser, accessToken });
     } catch (err) {
+      console.error("❌ Error REGISTER:", err);
       return res.status(500).json({ error: "Error interno" });
     }
   }
@@ -78,10 +111,12 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select("+password");
-    if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
+    if (!user)
+      return res.status(401).json({ error: "Credenciales inválidas" });
 
     const valid = await user.comparePassword(password);
-    if (!valid) return res.status(401).json({ error: "Credenciales inválidas" });
+    if (!valid)
+      return res.status(401).json({ error: "Credenciales inválidas" });
 
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
@@ -95,28 +130,109 @@ router.post("/login", async (req, res) => {
 
     return res.json({ user: safeUser, accessToken });
   } catch (err) {
+    console.error("❌ Error LOGIN:", err);
     return res.status(500).json({ error: "Error interno" });
   }
 });
 
 /* ======================================================
-   ME
+   ME (perfil del usuario logueado)
 ====================================================== */
-router.get("/me", async (req, res) => {
+router.get("/me", requireAuth, async (req, res) => {
   try {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-
-    if (!token) return res.json({ user: null });
-
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(payload.id);
+    const user = await User.findById(req.user.id).select(
+      "-password -refreshTokens"
+    );
+    if (!user) return res.json({ user: null });
 
     return res.json({ user });
-  } catch {
+  } catch (err) {
+    console.error("❌ Error ME:", err);
     return res.json({ user: null });
   }
 });
+
+/* ======================================================
+   UPDATE PROFILE (nombre, país, teléfono, direcciones)
+   PUT /api/auth/update
+====================================================== */
+router.put("/update", requireAuth, async (req, res) => {
+  try {
+    const allowedFields = ["name", "country", "phone", "addresses"];
+    const updates = {};
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, updates, {
+      new: true,
+    }).select("-password -refreshTokens");
+
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    return res.json({ user });
+  } catch (err) {
+    console.error("❌ Error UPDATE PROFILE:", err);
+    return res.status(500).json({ error: "Error interno" });
+  }
+});
+
+/* ======================================================
+   CHANGE PASSWORD
+   PUT /api/auth/change-password
+====================================================== */
+router.put(
+  "/change-password",
+  requireAuth,
+  [
+    body("currentPassword")
+      .isLength({ min: 1 })
+      .withMessage("La contraseña actual es obligatoria."),
+    body("newPassword").custom((value) => {
+      const visible = value.replace(/\s/g, "");
+      if (visible.length < 8) {
+        throw new Error(
+          "La nueva contraseña debe tener al menos 8 caracteres (sin contar espacios)."
+        );
+      }
+      if (!/\d/.test(visible)) {
+        throw new Error("La nueva contraseña debe incluir al menos un número.");
+      }
+      return true;
+    }),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      const user = await User.findById(req.user.id).select("+password");
+      if (!user) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      const isValid = await user.comparePassword(currentPassword);
+      if (!isValid) {
+        return res
+          .status(400)
+          .json({ error: "La contraseña actual no es correcta" });
+      }
+
+      user.password = newPassword; // el pre-save del modelo se encarga de hashearla
+      await user.save();
+
+      return res.json({ message: "Contraseña cambiada correctamente" });
+    } catch (err) {
+      console.error("❌ Error CHANGE-PASSWORD:", err);
+      return res.status(500).json({ error: "Error interno" });
+    }
+  }
+);
 
 /* ======================================================
    LOGOUT
@@ -128,6 +244,40 @@ router.post("/logout", async (req, res) => {
     secure: false,
   });
   res.json({ message: "Sesión cerrada correctamente" });
+});
+
+/* ======================================================
+   DELETE ACCOUNT (usuario se elimina a sí mismo)
+   DELETE /api/auth/delete-account
+====================================================== */
+router.delete("/delete-account", requireAuth, async (req, res) => {
+  try {
+    // Buscar usuario
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    // 1. Eliminar pedidos asociados (en Order guardas el email del usuario)
+    await Order.deleteMany({ user: user.email });
+
+    // 2. Eliminar el usuario
+    await User.findByIdAndDelete(user._id);
+
+    // 3. Limpiar cookie de refresh
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+    });
+
+    return res.json({ message: "Cuenta eliminada correctamente" });
+  } catch (err) {
+    console.error("❌ Error DELETE-ACCOUNT:", err);
+    return res
+      .status(500)
+      .json({ error: "Error al eliminar la cuenta. Inténtalo de nuevo." });
+  }
 });
 
 /* ======================================================
