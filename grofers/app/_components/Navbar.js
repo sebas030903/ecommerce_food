@@ -5,14 +5,12 @@ import { ShoppingCart } from "lucide-react";
 import { useCart } from "../_context/UpdateCartContext";
 import { useAuth } from "../_context/AuthContext";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 export default function Navbar() {
   const { cart, clearCart } = useCart();
   const { user, logout } = useAuth();
   const [openMenu, setOpenMenu] = useState(false);
   const menuRef = useRef(null);
-  const router = useRouter();
 
   const totalItems = cart.reduce((t, i) => t + i.quantity, 0);
 
@@ -21,21 +19,24 @@ export default function Navbar() {
     clearCart();
     setOpenMenu(false);
     toast.success("Sesión cerrada 👋");
-    router.push("/");
+
+    // navegación segura al inicio
+    window.location.href = "/";
   };
 
   return (
     <nav className="bg-green-600 text-white px-6 py-4 flex justify-between items-center shadow-md fixed top-0 left-0 right-0 z-50">
-      {/* LOGO */}
-      <button
-        onClick={() => router.push("/")}
+      {/* LOGO → SIEMPRE LLEVA AL INICIO */}
+      <Link
+        href="/"
         className="flex items-center gap-2 font-bold text-xl"
       >
         <img src="/logo.png" alt="FM" className="w-8 h-8" />
         <span>Food Market</span>
-      </button>
+      </Link>
 
       <div className="flex items-center gap-6">
+        {/* BOTÓN INICIO → TAMBIÉN LLEVA A / */}
         <Link href="/" className="hover:underline text-sm">
           🏠 Inicio
         </Link>
@@ -107,7 +108,7 @@ export default function Navbar() {
           </Link>
         )}
 
-        {/* Carrito */}
+        {/* CARRITO */}
         <Link href="/cart" className="relative flex items-center gap-1">
           <ShoppingCart className="w-5 h-5" />
           <span>Carrito</span>
