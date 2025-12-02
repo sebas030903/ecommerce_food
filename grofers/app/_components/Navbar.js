@@ -27,10 +27,7 @@ export default function Navbar() {
   return (
     <nav className="bg-green-600 text-white px-6 py-4 flex justify-between items-center shadow-md fixed top-0 left-0 right-0 z-50">
       {/* LOGO → SIEMPRE LLEVA AL INICIO */}
-      <Link
-        href="/"
-        className="flex items-center gap-2 font-bold text-xl"
-      >
+      <Link href="/" className="flex items-center gap-2 font-bold text-xl">
         <img src="/logo.png" alt="FM" className="w-8 h-8" />
         <span>Food Market</span>
       </Link>
@@ -53,8 +50,8 @@ export default function Navbar() {
 
             {openMenu && (
               <div className="absolute right-0 mt-2 w-52 bg-white text-gray-800 rounded-md shadow-lg p-2 overflow-hidden">
-                {/* BOTÓN ADMIN SOLO SI ES ADMIN */}
-                {user.role === "admin" && (
+                {/* Panel admin: ADMIN y ASSISTANT */}
+                {["admin", "assistant"].includes(user.role) && (
                   <Link
                     href="/admin"
                     className="block px-3 py-2 font-semibold text-blue-600 hover:bg-blue-50"
@@ -100,10 +97,7 @@ export default function Navbar() {
         )}
 
         {!user && (
-          <Link
-            href="/login?mode=login"
-            className="hover:underline text-sm"
-          >
+          <Link href="/login?mode=login" className="hover:underline text-sm">
             Iniciar sesión
           </Link>
         )}

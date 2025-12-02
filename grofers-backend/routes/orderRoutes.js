@@ -2,19 +2,23 @@ import express from "express";
 import { body } from "express-validator";
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireRole,
+  requireAdminOrAssistant,
+} from "../middleware/auth.js";
 import { handleValidation } from "../middleware/validate.js";
 
 const router = express.Router();
 
 /**
  * GET /api/orders
- * - admin → ve todos
+ * - admin / assistant → ven todos
  * - user → ve solo sus pedidos
  */
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const isAdmin = req.user.role === "admin";
+    const isAdmin = ["admin", "assistant"].includes(req.user.role);
     const query = isAdmin ? {} : { user: req.user.email };
 
     const projection = {
@@ -92,26 +96,31 @@ router.post(
 
 /**
  * DELETE /api/orders/:id
- * - Solo admin
+ * - Admin o Assistant
  */
-router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.delete(
+  "/:id",
+  requireAuth,
+  requireAdminOrAssistant,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "ID inválido" });
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+
+      const deleted = await Order.findByIdAndDelete(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Pedido no encontrado" });
+      }
+
+      res.json({ message: "Pedido eliminado correctamente" });
+    } catch (err) {
+      console.error("❌ Error al borrar pedido:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
     }
-
-    const deleted = await Order.findByIdAndDelete(id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Pedido no encontrado" });
-    }
-
-    res.json({ message: "Pedido eliminado correctamente" });
-  } catch (err) {
-    console.error("❌ Error al borrar pedido:", err);
-    res.status(500).json({ error: "Error interno del servidor" });
   }
-});
+);
 
 export default router;

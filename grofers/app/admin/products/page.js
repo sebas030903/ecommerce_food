@@ -30,11 +30,12 @@ export default function AdminProductsPage() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-  // 🔐 Validar admin
+  // 🔐 Validar admin o assistant
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return router.push("/login");
@@ -47,11 +48,14 @@ export default function AdminProductsPage() {
         const data = await res.json();
 
         if (!data.user) return router.push("/login");
-        if (data.user.role !== "admin") {
+
+        if (!["admin", "assistant"].includes(data.user.role)) {
           toast.error("Acceso denegado ❌");
           router.push("/");
           return;
         }
+
+        setCurrentUser(data.user);
       } catch (err) {
         router.push("/login");
       }
@@ -235,23 +239,30 @@ export default function AdminProductsPage() {
           >
             📦 Pedidos
           </Link>
-          <Link
-            href="/admin/users"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-          >
-            👥 Usuarios
-          </Link>
+
+          {/* Usuarios y estadísticas solo para ADMIN */}
+          {currentUser?.role === "admin" && (
+            <>
+              <Link
+                href="/admin/users"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+              >
+                👥 Usuarios
+              </Link>
+              <Link
+                href="/admin/stats"
+                className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition"
+              >
+                📊 Estadísticas
+              </Link>
+            </>
+          )}
+
           <Link
             href="/admin/products"
             className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition"
           >
             🛒 Productos
-          </Link>
-          <Link
-            href="/admin/stats"
-            className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition"
-          >
-            📊 Estadísticas
           </Link>
         </div>
       </div>

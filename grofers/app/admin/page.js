@@ -13,7 +13,7 @@ export default function AdminPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   // =====================================================
-  // 🔐 Validar ADMIN
+  // 🔐 Validar ADMIN o ASSISTANT
   // =====================================================
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -28,7 +28,7 @@ export default function AdminPage() {
 
         if (!data.user) return router.push("/login");
 
-        if (data.user.role !== "admin") {
+        if (!["admin", "assistant"].includes(data.user.role)) {
           toast.error("Acceso denegado ❌");
           router.push("/");
           return;
@@ -84,7 +84,7 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data.error);
 
       toast.success("Pedido eliminado 🗑️");
-      setOrders(orders.filter((o) => o._id !== id));
+      setOrders((prev) => prev.filter((o) => o._id !== id));
     } catch (err) {
       toast.error(err.message);
     }
@@ -109,7 +109,9 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold text-green-700">
           Panel de Administración 🧾
         </h1>
-        <p className="text-gray-600">Bienvenido, {user?.email}</p>
+        <p className="text-gray-600">
+          Bienvenido, {user?.email} ({user?.role})
+        </p>
       </div>
 
       {/* =====================================================
@@ -123,25 +125,31 @@ export default function AdminPage() {
           📦 Pedidos
         </Link>
 
-        <Link
-          href="/admin/users"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-        >
-          👥 Usuarios
-        </Link>
+        {/* Usuarios y estadísticas solo para ADMIN */}
+        {user?.role === "admin" && (
+          <>
+            <Link
+              href="/admin/users"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+            >
+              👥 Usuarios
+            </Link>
 
+            <Link
+              href="/admin/stats"
+              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition"
+            >
+              📊 Estadísticas
+            </Link>
+          </>
+        )}
+
+        {/* Productos: admin y assistant */}
         <Link
           href="/admin/products"
           className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition"
         >
           🛒 Productos
-        </Link>
-
-        <Link
-          href="/admin/stats"
-          className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition"
-        >
-          📊 Estadísticas
         </Link>
       </div>
 
@@ -155,8 +163,7 @@ export default function AdminPage() {
           <table className="min-w-full border border-gray-200">
             <thead className="bg-green-600 text-white">
               <tr>
-                <th className="px-4 py-2 text-left">Cliente</th>
-                <th className="px-4 py-2 text-left">Correo</th>
+                <th className="px-4 py-2 text-left">Cliente (correo)</th>
                 <th className="px-4 py-2 text-left">Total</th>
                 <th className="px-4 py-2 text-left">Fecha</th>
                 <th className="px-4 py-2 text-left">Dirección</th>
@@ -173,10 +180,6 @@ export default function AdminPage() {
                 >
                   <td className="px-4 py-2">{order.user}</td>
 
-                  <td className="px-4 py-2 text-gray-600">
-                    {order.email || "—"}
-                  </td>
-
                   <td className="px-4 py-2 font-semibold text-green-700">
                     ${order.total.toFixed(2)}
                   </td>
@@ -186,8 +189,8 @@ export default function AdminPage() {
                   </td>
 
                   <td className="px-4 py-2">
-                    {order.address?.street
-                      ? `${order.address.street}, ${order.address.city}`
+                    {order.shipping
+                      ? `${order.shipping.address}, ${order.shipping.city}, ${order.shipping.postal}`
                       : "No especificada"}
                   </td>
 
@@ -212,7 +215,6 @@ export default function AdminPage() {
                 </tr>
               ))}
             </tbody>
-
           </table>
         </div>
       )}

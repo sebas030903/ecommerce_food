@@ -1,6 +1,10 @@
 import express from "express";
 import Product from "../models/Product.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireRole,
+  requireAdminOrAssistant,
+} from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -12,7 +16,6 @@ router.get("/", async (req, res) => {
     const { category } = req.query;
     const filter = category ? { category } : {};
 
-    // ❗ QUITAR .lean()
     const products = await Product.find(filter).sort({ createdAt: -1 });
 
     res.json(products);
@@ -21,7 +24,6 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "Error cargando productos" });
   }
 });
-
 
 /* ============================
    GET /api/products/categories
@@ -37,9 +39,9 @@ router.get("/categories", async (_req, res) => {
 });
 
 /* ============================
-   POST /api/products (ADMIN)
+   POST /api/products (ADMIN o ASSISTANT)
 ============================ */
-router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
+router.post("/", requireAuth, requireAdminOrAssistant, async (req, res) => {
   try {
     const { title, description, image, category, price, stock } = req.body;
 
@@ -82,11 +84,18 @@ router.get("/:id", async (req, res) => {
 });
 
 /* ============================
-   PUT /api/products/:id (ADMIN)
+   PUT /api/products/:id (ADMIN o ASSISTANT)
 ============================ */
-router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
+router.put("/:id", requireAuth, requireAdminOrAssistant, async (req, res) => {
   try {
-    const allowed = ["title", "description", "image", "category", "price", "stock"];
+    const allowed = [
+      "title",
+      "description",
+      "image",
+      "category",
+      "price",
+      "stock",
+    ];
     const updates = {};
 
     for (const key of allowed) {
@@ -109,22 +118,27 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
 });
 
 /* ============================
-   DELETE /api/products/:id (ADMIN)
+   DELETE /api/products/:id (ADMIN o ASSISTANT)
 ============================ */
-router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
-  try {
-    const deleted = await Product.findByIdAndDelete(req.params.id);
+router.delete(
+  "/:id",
+  requireAuth,
+  requireAdminOrAssistant,
+  async (req, res) => {
+    try {
+      const deleted = await Product.findByIdAndDelete(req.params.id);
 
-    if (!deleted) {
-      return res.status(404).json({ error: "Producto no encontrado" });
+      if (!deleted) {
+        return res.status(404).json({ error: "Producto no encontrado" });
+      }
+
+      res.json({ message: "Producto eliminado correctamente" });
+    } catch (err) {
+      console.error("❌ Error DELETE /product:", err);
+      res.status(500).json({ error: "Error eliminando producto" });
     }
-
-    res.json({ message: "Producto eliminado correctamente" });
-  } catch (err) {
-    console.error("❌ Error DELETE /product:", err);
-    res.status(500).json({ error: "Error eliminando producto" });
   }
-});
+);
 
 /* ============================
    POST /api/products/reduce-stock
@@ -139,10 +153,15 @@ router.post("/reduce-stock", requireAuth, async (req, res) => {
 
     for (const item of cart) {
       const p = await Product.findById(item.id);
-      if (!p) return res.status(404).json({ error: `Producto no encontrado: ${item.title}` });
+      if (!p)
+        return res
+          .status(404)
+          .json({ error: `Producto no encontrado: ${item.title}` });
 
       if (p.stock < item.quantity) {
-        return res.status(400).json({ error: `Stock insuficiente para ${p.title}` });
+        return res
+          .status(400)
+          .json({ error: `Stock insuficiente para ${p.title}` });
       }
 
       p.stock -= item.quantity;

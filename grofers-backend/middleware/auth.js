@@ -19,6 +19,7 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+// ✅ Verificar si el usuario tiene alguno de los roles indicados
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -26,4 +27,12 @@ export function requireRole(...roles) {
     }
     next();
   };
+}
+
+// ✅ Nuevo: permitir solo a admin o assistant
+export function requireAdminOrAssistant(req, res, next) {
+  if (!req.user || !["admin", "assistant"].includes(req.user.role)) {
+    return res.status(403).json({ error: "Acceso denegado" });
+  }
+  next();
 }
