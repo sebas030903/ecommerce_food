@@ -22,7 +22,7 @@ export default function SuccessPage() {
         transition={{ duration: 0.5 }}
         className="text-3xl md:text-4xl font-bold text-green-600 mb-4"
       >
-        ¡Pago exitoso! 🎉
+        ¡Pedido registrado con éxito! 🎉
       </motion.h1>
 
       <motion.p
@@ -31,15 +31,25 @@ export default function SuccessPage() {
         transition={{ delay: 0.2, duration: 0.5 }}
         className="text-gray-700 text-lg mb-8 max-w-md"
       >
-        Gracias por tu compra. Te enviaremos los detalles por correo electrónico.
+        Gracias por tu compra. Pronto recibirás los detalles del pedido en tu
+        correo electrónico.
       </motion.p>
 
-      <Link
-        href="/"
-        className="bg-green-600 text-white px-5 py-2 rounded-md hover:bg-green-700 transition font-semibold"
-      >
-        Volver al inicio
-      </Link>
+      <div className="flex gap-4">
+        <Link
+          href="/orders"
+          className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition font-semibold"
+        >
+          Ver mis pedidos
+        </Link>
+
+        <button
+          onClick={() => router.push("/")}
+          className="bg-green-600 text-white px-5 py-2 rounded-md hover:bg-green-700 transition font-semibold"
+        >
+          Volver al inicio
+        </button>
+      </div>
     </div>
   );
 }

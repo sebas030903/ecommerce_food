@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useCart } from "../_context/UpdateCartContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -18,12 +18,67 @@ export default function CartPage() {
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  /* ================== TOTALES ================== */
+  const subtotal = useMemo(
+    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cart]
+  );
+  const shippingCost = 0;
+  const total = subtotal + shippingCost;
 
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [postal, setPostal] = useState("");
   const [loading, setLoading] = useState(false);
+
+  /* ================== DIRECCIONES PERFIL ================== */
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [addressMode, setAddressMode] = useState("new"); // "saved" | "new"
+
+  // para dirección guardada
+  const [savedPostal, setSavedPostal] = useState("");
+
+  // para nueva dirección
+  const [newLabel, setNewLabel] = useState("");
+  const [newStreet, setNewStreet] = useState("");
+  const [newCity, setNewCity] = useState("");
+  const [newPostal, setNewPostal] = useState("");
+  const [saveNewAddress, setSaveNewAddress] = useState(true);
+
+  // cargar direcciones desde /api/auth/me
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    fetch(`${API}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.user) return;
+
+        const addrs = data.user.addresses || [];
+        setAddresses(addrs);
+
+        if (addrs.length > 0) {
+          const primary = addrs.find((a) => a.isPrimary);
+          const first = primary || addrs[0];
+          setSelectedAddressId(String(first._id || first.id));
+          setAddressMode("saved");
+        } else {
+          setAddressMode("new");
+        }
+      })
+      .catch((err) => {
+        console.error("Error cargando direcciones:", err);
+      });
+  }, [API]);
+
+  const selectedAddress = useMemo(
+    () =>
+      addresses.find(
+        (a) => String(a._id || a.id) === String(selectedAddressId)
+      ) || null,
+    [addresses, selectedAddressId]
+  );
 
   /* ============================================================
     PAYMENT
@@ -37,14 +92,50 @@ export default function CartPage() {
       return router.push("/login?mode=login");
     }
 
-    if (!address || !city || !postal) {
-      return toast.error("Completa todos los campos de dirección 🏠");
+    let shipping;
+
+    // 👉 usar dirección guardada
+    if (addressMode === "saved" && addresses.length > 0) {
+      if (!selectedAddress) {
+        return toast.error("Selecciona una de tus direcciones guardadas 🏠");
+      }
+      if (!savedPostal.trim()) {
+        return toast.error("Ingresa el código postal 📮");
+      }
+
+      if (!selectedAddress.street) {
+        return toast.error(
+          "La dirección seleccionada no tiene calle/avenida configurada."
+        );
+      }
+
+      shipping = {
+        address: selectedAddress.street,
+        city: selectedAddress.district
+          ? `${selectedAddress.district}${
+              selectedAddress.province ? ", " + selectedAddress.province : ""
+            }`
+          : selectedAddress.province || "Ciudad",
+        postal: savedPostal.trim(),
+      };
+    } else {
+      // 👉 nueva dirección
+      if (!newStreet.trim() || !newCity.trim() || !newPostal.trim()) {
+        return toast.error("Completa todos los campos de la nueva dirección 🏠");
+      }
+
+      shipping = {
+        address: newStreet.trim(),
+        city: newCity.trim(),
+        postal: newPostal.trim(),
+      };
     }
 
     try {
       setLoading(true);
       toast.loading("Procesando pedido...");
 
+      // 1️⃣ Guardar pedido
       const orderRes = await fetch(`${API}/api/orders`, {
         method: "POST",
         headers: {
@@ -54,7 +145,7 @@ export default function CartPage() {
         body: JSON.stringify({
           cart,
           total,
-          shipping: { address, city, postal },
+          shipping,
         }),
       });
 
@@ -63,6 +154,7 @@ export default function CartPage() {
         throw new Error(data.error || "Error al registrar pedido");
       }
 
+      // 2️⃣ Actualizar stock
       const stockRes = await fetch(`${API}/api/products/reduce-stock`, {
         method: "POST",
         headers: {
@@ -77,11 +169,48 @@ export default function CartPage() {
         throw new Error(data.error || "Error al actualizar stock");
       }
 
+      // 3️⃣ Si es nueva dirección y el usuario quiere guardarla → actualizar perfil
+      if (addressMode === "new" && saveNewAddress) {
+        const newAddr = {
+          label: newLabel || `Dirección ${addresses.length + 1}`,
+          street: newStreet.trim(),
+          department: "",
+          province: "",
+          district: newCity.trim(),
+          isPrimary: addresses.length === 0,
+        };
+
+        const updatedAddresses = [...addresses, newAddr];
+
+        try {
+          const updRes = await fetch(`${API}/api/auth/update`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ addresses: updatedAddresses }),
+          });
+
+          const updData = await updRes.json();
+          if (!updRes.ok) {
+            console.error(
+              "Error guardando nueva dirección en perfil:",
+              updData
+            );
+          } else {
+            setAddresses(updatedAddresses);
+          }
+        } catch (err) {
+          console.error("Error al actualizar direcciones en perfil:", err);
+        }
+      }
+
       toast.dismiss();
       toast.success("Pedido registrado correctamente ✔");
 
       clearCart();
-      setTimeout(() => router.push("/"), 1200);
+      setTimeout(() => router.push("/success"), 1000);
     } catch (err) {
       toast.dismiss();
       toast.error(err.message || "Error en la compra");
@@ -96,8 +225,15 @@ export default function CartPage() {
   if (cart.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] text-gray-600">
-        <Image src="/empty-cart.svg" alt="Carrito vacío" width={250} height={250} />
-        <h2 className="mt-4 text-2xl font-semibold">Tu carrito está vacío 🛒</h2>
+        <Image
+          src="/empty-cart.svg"
+          alt="Carrito vacío"
+          width={250}
+          height={250}
+        />
+        <h2 className="mt-4 text-2xl font-semibold">
+          Tu carrito está vacío 🛒
+        </h2>
         <button
           onClick={() => router.push("/")}
           className="mt-6 bg-green-600 text-white px-5 py-2 rounded-md hover:bg-green-700 transition"
@@ -119,7 +255,7 @@ export default function CartPage() {
         {/* ===================== PRODUCT LIST ===================== */}
         <div className="md:col-span-2 space-y-5">
           {cart.map((item) => {
-            const productId = item._id || item.id; // 🔥 FIX ID
+            const productId = item._id || item.id;
 
             return (
               <motion.div
@@ -141,7 +277,9 @@ export default function CartPage() {
                   </div>
 
                   <div>
-                    <p className="font-semibold text-gray-800">{item.title}</p>
+                    <p className="font-semibold text-gray-800">
+                      {item.title}
+                    </p>
                     <p className="text-green-600 font-bold">${item.price}</p>
 
                     {/* === QUANTITY === */}
@@ -192,7 +330,7 @@ export default function CartPage() {
           })}
         </div>
 
-        {/* ===================== SUMMARY ===================== */}
+        {/* ===================== SUMMARY & SHIPPING ===================== */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -203,32 +341,161 @@ export default function CartPage() {
             Dirección de envío 🏠
           </h2>
 
-          <div className="space-y-3 mb-6">
-            <input
-              type="text"
-              placeholder="Dirección (ej: Av. Ejército 123)"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full border p-2 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
-            />
+          {/* Selector de modo si hay direcciones */}
+          {addresses.length > 0 && (
+            <div className="flex gap-3 text-sm mb-4">
+              <button
+                type="button"
+                onClick={() => setAddressMode("saved")}
+                className={`px-3 py-1 rounded border ${
+                  addressMode === "saved"
+                    ? "bg-green-100 border-green-500 text-green-700"
+                    : "bg-white border-gray-300"
+                }`}
+              >
+                Usar dirección guardada
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddressMode("new")}
+                className={`px-3 py-1 rounded border ${
+                  addressMode === "new"
+                    ? "bg-green-100 border-green-500 text-green-700"
+                    : "bg-white border-gray-300"
+                }`}
+              >
+                Nueva dirección
+              </button>
+            </div>
+          )}
 
-            <input
-              type="text"
-              placeholder="Ciudad (ej: Arequipa)"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full border p-2 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
-            />
+          {addresses.length === 0 && (
+            <p className="text-xs text-gray-500 mb-3">
+              Aún no tienes direcciones guardadas. Registra una nueva para este
+              pedido (puedes guardarla en tu perfil).
+            </p>
+          )}
 
-            <input
-              type="text"
-              placeholder="Código postal"
-              value={postal}
-              onChange={(e) => setPostal(e.target.value)}
-              className="w-full border p-2 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
-            />
-          </div>
+          {/* MODO: DIRECCIÓN GUARDADA */}
+          {addressMode === "saved" && addresses.length > 0 && (
+            <div className="space-y-3 mb-6">
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Selecciona una dirección
+                </label>
+                <select
+                  value={selectedAddressId || ""}
+                  onChange={(e) => setSelectedAddressId(e.target.value)}
+                  className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm"
+                >
+                  {addresses.map((addr) => (
+                    <option
+                      key={addr._id || addr.id}
+                      value={addr._id || addr.id}
+                    >
+                      {addr.label || "Dirección"} — {addr.street}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              {selectedAddress && (
+                <div className="text-xs text-gray-600 bg-gray-50 border rounded-md p-2">
+                  <p>{selectedAddress.street}</p>
+                  <p>
+                    {selectedAddress.district &&
+                      `${selectedAddress.district}${
+                        selectedAddress.province
+                          ? ", " + selectedAddress.province
+                          : ""
+                      }`}
+                  </p>
+                  <p>{selectedAddress.department}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Código postal
+                </label>
+                <input
+                  type="text"
+                  value={savedPostal}
+                  onChange={(e) => setSavedPostal(e.target.value)}
+                  className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm"
+                  placeholder="Código postal"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* MODO: NUEVA DIRECCIÓN */}
+          {addressMode === "new" && (
+            <div className="space-y-3 mb-6">
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Nombre de la dirección
+                </label>
+                <input
+                  type="text"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm"
+                  placeholder="Ej: Casa, Trabajo, Dirección 2"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Dirección (calle, número, referencia)
+                </label>
+                <input
+                  type="text"
+                  value={newStreet}
+                  onChange={(e) => setNewStreet(e.target.value)}
+                  className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm"
+                  placeholder="Ej: Av. Ejército 123"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Ciudad / Distrito
+                </label>
+                <input
+                  type="text"
+                  value={newCity}
+                  onChange={(e) => setNewCity(e.target.value)}
+                  className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm"
+                  placeholder="Ej: Arequipa, Cercado"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Código postal
+                </label>
+                <input
+                  type="text"
+                  value={newPostal}
+                  onChange={(e) => setNewPostal(e.target.value)}
+                  className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm"
+                  placeholder="Código postal"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={saveNewAddress}
+                  onChange={(e) => setSaveNewAddress(e.target.checked)}
+                />
+                Guardar esta dirección en mi perfil
+              </label>
+            </div>
+          )}
+
+          {/* RESUMEN DEL PEDIDO */}
           <h3 className="text-lg font-semibold text-gray-700 mb-2">
             Resumen del pedido
           </h3>
@@ -236,7 +503,7 @@ export default function CartPage() {
           <div className="text-gray-700 space-y-2">
             <p className="flex justify-between">
               <span>Subtotal:</span>
-              <span>${total.toFixed(2)}</span>
+              <span>${subtotal.toFixed(2)}</span>
             </p>
 
             <p className="flex justify-between">
