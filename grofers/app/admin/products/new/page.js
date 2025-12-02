@@ -28,7 +28,11 @@ export default function NewProductPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        price: Number(form.price),
+        stock: Number(form.stock),
+      }),
     });
 
     const data = await res.json();
@@ -47,45 +51,59 @@ export default function NewProductPage() {
       <h1 className="text-3xl font-bold mb-6">Crear Producto</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        
         <input
           placeholder="Título"
           className="w-full p-2 border rounded"
+          value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
+          required
         />
 
         <textarea
           placeholder="Descripción"
           className="w-full p-2 border rounded"
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          value={form.description}
+          onChange={(e) =>
+            setForm({ ...form, description: e.target.value })
+          }
         ></textarea>
 
         <input
           type="text"
           placeholder="URL de Imagen"
           className="w-full p-2 border rounded"
+          value={form.image}
           onChange={(e) => setForm({ ...form, image: e.target.value })}
+          required
         />
 
         <input
           placeholder="Categoría (Ej: Bebidas)"
           className="w-full p-2 border rounded"
+          value={form.category}
           onChange={(e) => setForm({ ...form, category: e.target.value })}
+          required
         />
 
         <input
           type="number"
           placeholder="Precio"
           className="w-full p-2 border rounded"
-          onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+          value={form.price}
+          onChange={(e) =>
+            setForm({ ...form, price: Number(e.target.value) })
+          }
+          required
         />
 
         <input
           type="number"
           placeholder="Stock"
           className="w-full p-2 border rounded"
-          defaultValue={100}
-          onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+          value={form.stock}
+          onChange={(e) =>
+            setForm({ ...form, stock: Number(e.target.value) })
+          }
         />
 
         <button className="bg-green-600 text-white px-4 py-2 rounded">

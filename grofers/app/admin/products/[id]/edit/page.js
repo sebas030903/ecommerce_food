@@ -14,7 +14,8 @@ export default function EditProductPage({ params }) {
   useEffect(() => {
     fetch(`${API}/api/products/${id}`)
       .then((res) => res.json())
-      .then((data) => setForm(data));
+      .then((data) => setForm(data))
+      .catch(() => toast.error("Error cargando producto"));
   }, [API, id]);
 
   const updateProduct = async (e) => {
@@ -49,7 +50,6 @@ export default function EditProductPage({ params }) {
       <h1 className="text-3xl font-bold mb-6">Editar Producto</h1>
 
       <form onSubmit={updateProduct} className="space-y-4">
-
         <input
           value={form.title}
           className="w-full p-2 border rounded"
@@ -59,7 +59,9 @@ export default function EditProductPage({ params }) {
         <textarea
           value={form.description}
           className="w-full p-2 border rounded"
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          onChange={(e) =>
+            setForm({ ...form, description: e.target.value })
+          }
         ></textarea>
 
         <input
@@ -78,14 +80,18 @@ export default function EditProductPage({ params }) {
           type="number"
           value={form.price}
           className="w-full p-2 border rounded"
-          onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+          onChange={(e) =>
+            setForm({ ...form, price: Number(e.target.value) })
+          }
         />
 
         <input
           type="number"
           value={form.stock}
           className="w-full p-2 border rounded"
-          onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+          onChange={(e) =>
+            setForm({ ...form, stock: Number(e.target.value) })
+          }
         />
 
         <button className="bg-blue-600 text-white px-4 py-2 rounded">

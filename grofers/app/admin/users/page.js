@@ -4,10 +4,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 
+const PAGE_SIZE = 10; // usuarios por página
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -121,6 +126,19 @@ export default function AdminUsersPage() {
   };
 
   /* ============================================================
+     FILTRO + PAGINACIÓN
+  ============================================================ */
+  const filtered = users.filter((u) => {
+    const text = `${u.name || ""} ${u.email || ""}`.toLowerCase();
+    return text.includes(search.toLowerCase());
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const currentUsers = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+
+  /* ============================================================
      LOADING
   ============================================================ */
   if (loading) {
@@ -177,10 +195,30 @@ export default function AdminUsersPage() {
       </div>
 
       {/* ============================================================
+         BUSCADOR
+      ============================================================ */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por nombre o correo..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          className="w-full md:w-96 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none"
+        />
+      </div>
+
+      {/* ============================================================
          TABLA DE USUARIOS
       ============================================================ */}
-      {users.length === 0 ? (
-        <p className="text-gray-600">No hay usuarios registrados.</p>
+      {filtered.length === 0 ? (
+        <p className="text-gray-600">
+          {users.length === 0
+            ? "No hay usuarios registrados."
+            : "No se encontraron usuarios que coincidan con la búsqueda."}
+        </p>
       ) : (
         <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
           <table className="min-w-full border border-gray-200">
@@ -195,7 +233,7 @@ export default function AdminUsersPage() {
             </thead>
 
             <tbody>
-              {users.map((u) => {
+              {currentUsers.map((u) => {
                 const displayName =
                   u.name || (u.email ? u.email.split("@")[0] : "Usuario");
 
@@ -250,8 +288,47 @@ export default function AdminUsersPage() {
                 );
               })}
             </tbody>
-
           </table>
+        </div>
+      )}
+
+      {/* ============================================================
+         PAGINACIÓN
+      ============================================================ */}
+      {filtered.length > 0 && totalPages > 1 && (
+        <div className="flex items-center gap-2 mt-4 flex-wrap">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+          >
+            ← Anterior
+          </button>
+
+          {Array.from({ length: totalPages }).map((_, i) => {
+            const num = i + 1;
+            return (
+              <button
+                key={num}
+                onClick={() => setPage(num)}
+                className={`px-3 py-1 border rounded-md text-sm ${
+                  num === currentPage
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white hover:bg-blue-50"
+                }`}
+              >
+                {num}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+          >
+            Siguiente →
+          </button>
         </div>
       )}
     </div>

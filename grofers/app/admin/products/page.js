@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 
+const PAGE_SIZE = 10; // productos por página
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +25,11 @@ export default function AdminProductsPage() {
     price: "",
     stock: "",
     category: "",
+    image: "",
   });
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -75,27 +81,35 @@ export default function AdminProductsPage() {
     fetchProducts();
   }, [API]);
 
-  // 🛠 Editar producto
+  // 🛠 Editar producto (inline)
   const startEdit = (p) => {
-    setEditingId(p._id);
+    const id = p._id || p.id;
+    setEditingId(id);
     setEditForm({
       title: p.title,
       price: p.price,
       stock: p.stock,
       category: p.category || "",
+      image: p.image || "",
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ title: "", price: "", stock: "", category: "" });
+    setEditForm({
+      title: "",
+      price: "",
+      stock: "",
+      category: "",
+      image: "",
+    });
   };
 
   const saveEdit = async (id) => {
     try {
       const token = localStorage.getItem("accessToken");
       const res = await fetch(`${API}/api/products/${id}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -105,13 +119,17 @@ export default function AdminProductsPage() {
           price: Number(editForm.price),
           stock: Number(editForm.stock),
           category: editForm.category,
+          image: editForm.image,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al actualizar producto");
+      if (!res.ok)
+        throw new Error(data.error || "Error al actualizar producto");
 
       setProducts((prev) =>
-        prev.map((p) => (p._id === id ? { ...p, ...data } : p))
+        prev.map((p) =>
+          (p._id || p.id) === id ? { ...p, ...data } : p
+        )
       );
       toast.success("Producto actualizado ✅");
       cancelEdit();
@@ -168,12 +186,27 @@ export default function AdminProductsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al eliminar producto");
 
-      setProducts((prev) => prev.filter((p) => p._id !== id));
+      setProducts((prev) =>
+        prev.filter((p) => (p._id || p.id) !== id)
+      );
       toast.success("Producto eliminado 🗑️");
     } catch (err) {
       toast.error(err.message);
     }
   };
+
+  /* ============================================================
+     FILTRO + PAGINACIÓN
+  ============================================================ */
+  const filtered = products.filter((p) => {
+    const text = `${p.title || ""} ${p.category || ""}`.toLowerCase();
+    return text.includes(search.toLowerCase());
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const currentProducts = filtered.slice(startIndex, startIndex + PAGE_SIZE);
 
   if (loading)
     return (
@@ -297,9 +330,27 @@ export default function AdminProductsPage() {
         )}
       </div>
 
+      {/* BUSCADOR */}
+      <div className="mb-4 flex justify-end">
+        <input
+          type="text"
+          placeholder="Buscar por nombre o categoría..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          className="w-full md:w-96 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none"
+        />
+      </div>
+
       {/* TABLA PRODUCTOS */}
-      {products.length === 0 ? (
-        <p className="text-gray-600">No hay productos registrados.</p>
+      {filtered.length === 0 ? (
+        <p className="text-gray-600">
+          {products.length === 0
+            ? "No hay productos registrados."
+            : "No se encontraron productos que coincidan con la búsqueda."}
+        </p>
       ) : (
         <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
           <table className="min-w-full border border-gray-200">
@@ -309,110 +360,186 @@ export default function AdminProductsPage() {
                 <th className="px-4 py-2 text-left">Categoría</th>
                 <th className="px-4 py-2 text-left">Precio</th>
                 <th className="px-4 py-2 text-left">Stock</th>
+                <th className="px-4 py-2 text-left">Imagen (URL)</th>
                 <th className="px-4 py-2 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => (
-                <tr
-                  key={p._id}
-                  className="border-b hover:bg-gray-100 transition"
-                >
-                  <td className="px-4 py-2">
-                    {editingId === p._id ? (
-                      <input
-                        className="border rounded-md px-2 py-1 w-full"
-                        value={editForm.title}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, title: e.target.value })
-                        }
-                      />
-                    ) : (
-                      p.title
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {editingId === p._id ? (
-                      <input
-                        className="border rounded-md px-2 py-1 w-full"
-                        value={editForm.category}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            category: e.target.value,
-                          })
-                        }
-                      />
-                    ) : (
-                      p.category || "—"
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {editingId === p._id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="border rounded-md px-2 py-1 w-full"
-                        value={editForm.price}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, price: e.target.value })
-                        }
-                      />
-                    ) : (
-                      `$${Number(p.price).toFixed(2)}`
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {editingId === p._id ? (
-                      <input
-                        type="number"
-                        className="border rounded-md px-2 py-1 w-full"
-                        value={editForm.stock}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, stock: e.target.value })
-                        }
-                      />
-                    ) : (
-                      p.stock
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {editingId === p._id ? (
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => saveEdit(p._id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
-                        >
-                          Guardar
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md text-sm hover:bg-gray-400"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => startEdit(p)}
-                          className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p._id)}
-                          className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {currentProducts.map((p) => {
+                const id = p._id || p.id;
+                const isEditing = editingId === id;
+
+                return (
+                  <tr
+                    key={id}
+                    className="border-b hover:bg-gray-100 transition"
+                  >
+                    <td className="px-4 py-2">
+                      {isEditing ? (
+                        <input
+                          className="border rounded-md px-2 py-1 w-full"
+                          value={editForm.title}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              title: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        p.title
+                      )}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      {isEditing ? (
+                        <input
+                          className="border rounded-md px-2 py-1 w-full"
+                          value={editForm.category}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              category: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        p.category || "—"
+                      )}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="border rounded-md px-2 py-1 w-full"
+                          value={editForm.price}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              price: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        `$${Number(p.price).toFixed(2)}`
+                      )}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          className="border rounded-md px-2 py-1 w-full"
+                          value={editForm.stock}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              stock: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        p.stock
+                      )}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      {isEditing ? (
+                        <input
+                          className="border rounded-md px-2 py-1 w-full text-xs"
+                          value={editForm.image}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              image: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        <span className="text-xs text-blue-600 break-all">
+                          {p.image}
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-2 text-center">
+                      {isEditing ? (
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => saveEdit(id)}
+                            className="px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md text-sm hover:bg-gray-400"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => startEdit(p)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(id)}
+                            className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* PAGINACIÓN */}
+      {filtered.length > 0 && totalPages > 1 && (
+        <div className="flex items-center gap-2 mt-4 flex-wrap">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+          >
+            ← Anterior
+          </button>
+
+          {Array.from({ length: totalPages }).map((_, i) => {
+            const num = i + 1;
+            return (
+              <button
+                key={num}
+                onClick={() => setPage(num)}
+                className={`px-3 py-1 border rounded-md text-sm ${
+                  num === currentPage
+                    ? "bg-purple-600 text-white border-purple-600"
+                    : "bg-white hover:bg-purple-50"
+                }`}
+              >
+                {num}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+          >
+            Siguiente →
+          </button>
         </div>
       )}
     </div>
