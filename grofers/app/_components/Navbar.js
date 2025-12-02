@@ -36,7 +36,9 @@ export default function Navbar() {
       </button>
 
       <div className="flex items-center gap-6">
-        <Link href="/" className="hover:underline text-sm">🏠 Inicio</Link>
+        <Link href="/" className="hover:underline text-sm">
+          🏠 Inicio
+        </Link>
 
         {user && (
           <div className="relative" ref={menuRef}>
@@ -49,9 +51,8 @@ export default function Navbar() {
             </button>
 
             {openMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg p-2 overflow-hidden">
-
-                {/* 🔥 BOTÓN ADMIN SOLO SI ES ADMIN */}
+              <div className="absolute right-0 mt-2 w-52 bg-white text-gray-800 rounded-md shadow-lg p-2 overflow-hidden">
+                {/* BOTÓN ADMIN SOLO SI ES ADMIN */}
                 {user.role === "admin" && (
                   <Link
                     href="/admin"
@@ -68,6 +69,14 @@ export default function Navbar() {
                   onClick={() => setOpenMenu(false)}
                 >
                   🧑 Mi Perfil
+                </Link>
+
+                <Link
+                  href="/profile#addresses"
+                  className="block px-3 py-2 hover:bg-gray-100"
+                  onClick={() => setOpenMenu(false)}
+                >
+                  📍 Mis Direcciones
                 </Link>
 
                 <Link
@@ -90,7 +99,10 @@ export default function Navbar() {
         )}
 
         {!user && (
-          <Link href="/login?mode=login" className="hover:underline text-sm">
+          <Link
+            href="/login?mode=login"
+            className="hover:underline text-sm"
+          >
             Iniciar sesión
           </Link>
         )}
