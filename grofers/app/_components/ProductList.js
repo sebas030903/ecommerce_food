@@ -6,6 +6,8 @@ import { useCart } from "../_context/UpdateCartContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
+const PAGE_SIZE = 12; // 👉 productos por página (cámbialo si quieres)
+
 export default function ProductList() {
   const { cart, addToCart } = useCart();
   const [products, setProducts] = useState([]);
@@ -13,6 +15,8 @@ export default function ProductList() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const [page, setPage] = useState(1); // 👉 página actual
 
   // Cargar productos y categorías
   useEffect(() => {
@@ -34,6 +38,11 @@ export default function ProductList() {
     loadData();
   }, []);
 
+  // Cuando cambian filtros, volvemos a la página 1
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedCategory]);
+
   // Filtrar productos
   const filtered = products.filter((p) => {
     const matchesSearch =
@@ -44,6 +53,27 @@ export default function ProductList() {
       : true;
     return matchesSearch && matchesCategory;
   });
+
+  // 👉 PAGINACIÓN sobre los productos filtrados
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filtered.length / PAGE_SIZE)
+  );
+  const startIndex = (page - 1) * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+  const currentProducts = filtered.slice(startIndex, endIndex);
+
+  const handlePrev = () => {
+    if (page > 1) setPage((prev) => prev - 1);
+  };
+
+  const handleNext = () => {
+    if (page < totalPages) setPage((prev) => prev + 1);
+  };
+
+  const handleGoToPage = (pageNumber) => {
+    setPage(pageNumber);
+  };
 
   if (loading)
     return (
@@ -87,79 +117,120 @@ export default function ProductList() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center text-gray-600">No se encontraron productos 😔</p>
+        <p className="text-center text-gray-600">
+          No se encontraron productos 😔
+        </p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filtered.map((item) => {
-            // 🔥 CORRECCIÓN: usar item.id
-            const productId = item.id;
+        <>
+          {/* GRID DE PRODUCTOS DE LA PÁGINA ACTUAL */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+            {currentProducts.map((item) => {
+              const productId = item.id;
 
-            // Cantidad en carrito
-            const inCart = cart.find((p) => p.id === productId);
-            const quantityInCart = inCart?.quantity || 0;
+              // Cantidad en carrito
+              const inCart = cart.find((p) => p.id === productId);
+              const quantityInCart = inCart?.quantity || 0;
 
-            const remainingStock = Math.max(item.stock - quantityInCart, 0);
-            const isOutOfStock = remainingStock <= 0;
+              const remainingStock = Math.max(item.stock - quantityInCart, 0);
+              const isOutOfStock = remainingStock <= 0;
 
-            return (
-              <motion.div
-                key={productId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="border rounded-lg bg-white shadow hover:shadow-lg transition cursor-pointer flex flex-col"
-              >
-                <div className="relative w-full h-48 p-2">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-
-                <div className="p-3 text-center flex flex-col flex-1 justify-between">
-                  <div>
-                    <h3 className="text-gray-800 font-medium text-sm line-clamp-2">
-                      {item.title}
-                    </h3>
-                    <p className="text-green-600 font-bold mt-1">
-                      ${item.price}
-                    </p>
-                    <p className="text-gray-500 text-xs">
-                      Stock disponible: {remainingStock}
-                    </p>
+              return (
+                <motion.div
+                  key={productId}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="border rounded-lg bg-white shadow hover:shadow-lg transition cursor-pointer flex flex-col"
+                >
+                  <div className="relative w-full h-48 p-2">
+                    <Image
+                      src={item.image}
+                      alt={item.title}
+                      fill
+                      className="object-contain"
+                    />
                   </div>
 
-                  <button
-                    disabled={isOutOfStock}
-                    onClick={() => {
-                      if (isOutOfStock) {
-                        return toast.error("Producto agotado ❌");
-                      }
+                  <div className="p-3 text-center flex flex-col flex-1 justify-between">
+                    <div>
+                      <h3 className="text-gray-800 font-medium text-sm line-clamp-2">
+                        {item.title}
+                      </h3>
+                      <p className="text-green-600 font-bold mt-1">
+                        ${item.price}
+                      </p>
+                      <p className="text-gray-500 text-xs">
+                        Stock disponible: {remainingStock}
+                      </p>
+                    </div>
 
-                      // 🔥 enviar ID correcto → item.id
-                      addToCart({
-                        id: item.id,
-                        title: item.title,
-                        image: item.image,
-                        price: item.price,
-                        stock: item.stock,
-                      });
-                    }}
-                    className={`mt-2 w-full py-1.5 rounded-md text-white font-semibold transition ${
-                      isOutOfStock
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-700"
+                    <button
+                      disabled={isOutOfStock}
+                      onClick={() => {
+                        if (isOutOfStock) {
+                          return toast.error("Producto agotado ❌");
+                        }
+
+                        addToCart({
+                          id: item.id,
+                          title: item.title,
+                          image: item.image,
+                          price: item.price,
+                          stock: item.stock,
+                        });
+                      }}
+                      className={`mt-2 w-full py-1.5 rounded-md text-white font-semibold transition ${
+                        isOutOfStock
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-green-600 hover:bg-green-700"
+                      }`}
+                    >
+                      {isOutOfStock ? "Agotado" : "Agregar"}
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* CONTROLES DE PAGINACIÓN */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
+              <button
+                onClick={handlePrev}
+                disabled={page === 1}
+                className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+              >
+                ← Anterior
+              </button>
+
+              {Array.from({ length: totalPages }).map((_, index) => {
+                const pageNumber = index + 1;
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => handleGoToPage(pageNumber)}
+                    className={`px-3 py-1 border rounded-md text-sm ${
+                      pageNumber === page
+                        ? "bg-green-600 text-white border-green-600"
+                        : "bg-white hover:bg-green-50"
                     }`}
                   >
-                    {isOutOfStock ? "Agotado" : "Agregar"}
+                    {pageNumber}
                   </button>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
+                );
+              })}
+
+              <button
+                onClick={handleNext}
+                disabled={page === totalPages}
+                className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
