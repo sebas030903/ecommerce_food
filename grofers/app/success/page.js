@@ -1,17 +1,9 @@
 "use client";
-import { useEffect } from "react";
-import { useCart } from "../_context/UpdateCartContext";
+
 import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function SuccessPage() {
-  const { clearCart } = useCart();
-
-  // 🧹 Limpiar carrito automáticamente al entrar
-  useEffect(() => {
-    clearCart();
-  }, [clearCart]);
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-white text-center px-4">
       <motion.h1
