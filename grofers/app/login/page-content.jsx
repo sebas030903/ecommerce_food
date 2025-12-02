@@ -33,6 +33,52 @@ export default function LoginPage() {
     e.preventDefault();
     setErr("");
 
+    // 🔐 VALIDACIONES SOLO PARA CREAR CUENTA
+    if (mode === "register") {
+      // 1) Validar nombre: solo letras y espacios
+      const nameTrimmed = name.trim();
+      const nameRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+
+      if (!nameTrimmed || !nameRegex.test(nameTrimmed)) {
+        const msg = "El nombre solo puede contener letras y espacios.";
+        setErr(msg);
+        toast.error(msg);
+        return;
+      }
+
+      // 2) Validar correo: solo gmail/hotmail/outlook
+      const emailRegex =
+        /^[^\s@]+@(gmail\.com|hotmail\.com|outlook\.com)$/i;
+
+      if (!emailRegex.test(email)) {
+        const msg =
+          "El correo debe terminar en @gmail.com, @hotmail.com o @outlook.com.";
+        setErr(msg);
+        toast.error(msg);
+        return;
+      }
+
+      // 3) Validar contraseña:
+      //    - mínimo 8 caracteres visibles (ignorando espacios)
+      //    - al menos 1 número
+      const passwordVisible = password.replace(/\s/g, ""); // quita espacios y espacios invisibles
+
+      if (passwordVisible.length < 8) {
+        const msg =
+          "La contraseña debe tener al menos 8 caracteres (sin contar espacios).";
+        setErr(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (!/\d/.test(passwordVisible)) {
+        const msg = "La contraseña debe incluir al menos un número.";
+        setErr(msg);
+        toast.error(msg);
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -132,15 +178,18 @@ export default function LoginPage() {
               className="w-full mt-1 border border-gray-300 rounded-md p-2"
               required
             />
+            {mode === "register" && (
+              <p className="mt-1 text-xs text-gray-500">
+                Mínimo 8 caracteres visibles y al menos un número.
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
             className={`w-full py-2 rounded-md font-semibold text-white ${
-              loading
-                ? "bg-green-400"
-                : "bg-green-600 hover:bg-green-700"
+              loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"
             }`}
           >
             {loading
@@ -173,9 +222,7 @@ export default function LoginPage() {
               setMode(mode === "login" ? "register" : "login")
             }
           >
-            {mode === "login"
-              ? "Regístrate aquí"
-              : "Inicia sesión"}
+            {mode === "login" ? "Regístrate aquí" : "Inicia sesión"}
           </button>
         </p>
       </div>
