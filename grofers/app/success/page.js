@@ -1,12 +1,10 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useCart } from "../_context/UpdateCartContext";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function SuccessPage() {
-  const router = useRouter();
   const { clearCart } = useCart();
 
   // 🧹 Limpiar carrito automáticamente al entrar
@@ -35,7 +33,7 @@ export default function SuccessPage() {
         correo electrónico.
       </motion.p>
 
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4 justify-center">
         <Link
           href="/orders"
           className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition font-semibold"
@@ -43,12 +41,12 @@ export default function SuccessPage() {
           Ver mis pedidos
         </Link>
 
-        <button
-          onClick={() => router.push("/")}
+        <Link
+          href="/"
           className="bg-green-600 text-white px-5 py-2 rounded-md hover:bg-green-700 transition font-semibold"
         >
           Volver al inicio
-        </button>
+        </Link>
       </div>
     </div>
   );
